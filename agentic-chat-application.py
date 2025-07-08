@@ -1,66 +1,74 @@
 import json
+import os
 
 from dotenv import load_dotenv
-from openai import OpenAI
+import google.generativeai as genai
 
 load_dotenv()
 
-client = OpenAI()
+# Set up Gemini API
+api_key = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=api_key)
+
+# Use Gemini's free model
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 system_prompt = """
-You are an AI assistant who is expert in breaking down complex problems and then resolve the user query.
+You are an AI assistant who is expert in breaking down complex problems and then resolving the user query.
 
 For the given user input, analyse the input and break down the problem step by step.
-Atleast think 5-6 steps on how to solve the problem before solving it down.
+At least think 5-6 steps on how to solve the problem before solving it.
 
-The steps are you get a user input, you analyse, you think, you again think for several times and then return an output with explanation and then finally you validate the output as well before giving final result.
-
-Follow the steps in sequence that is "analyse", "think", "output", "validate" and finally "result".
+The steps are: "analyse", "think", "output", "validate", and finally "result".
 
 Rules:
-1. Follow the strict JSON output as per Output schema.
-2. Always perform one step at a time and wait for next input
-3. Carefully analyse the user query
+1. Follow the strict JSON output schema.
+2. Always perform one step at a time and wait for the next input.
+3. Carefully analyse the user query.
 
-Output Format:
-{{ step: "string", content: "string" }}
+✅ Output Format (strict JSON):
+{ "step": "string", "content": "string" }
 
-Example:
+🧪 Example:
 Input: What is 2 + 2.
-Output: {{ step: "analyse", content: "Alright! The user is intersted in maths query and he is asking a basic arthermatic operation" }}
-Output: {{ step: "think", content: "To perform the addition i must go from left to right and add all the operands" }}
-Output: {{ step: "output", content: "4" }}
-Output: {{ step: "validate", content: "seems like 4 is correct ans for 2 + 2" }}
-Output: {{ step: "result", content: "2 + 2 = 4 and that is calculated by adding all numbers" }}
-
+Output: { "step": "analyse", "content": "The user is interested in a basic arithmetic question: 2 + 2." }
+Output: { "step": "think", "content": "To perform the addition, I need to add 2 and 2." }
+Output: { "step": "output", "content": "4" }
+Output: { "step": "validate", "content": "The result of 2 + 2 is indeed 4." }
+Output: { "step": "result", "content": "2 + 2 = 4" }
 """
+# Start a chat session with Gemini
+chat = model.start_chat(
+    history=[
+    {"role": "user", "parts": [system_prompt]}
+])
 
-messages = [
-    { "role": "system", "content": system_prompt },
-]
-
-
+# Take user query
 query = input("> ")
-messages.append({ "role": "user", "content": query })
-
+chat.send_message(query)
 
 while True:
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        response_format={"type": "json_object"},
-        messages=messages
-    )
+    if(query=="exit"):
+        print("Alright. That's my time. Have a good day everyone!")
+        break
+    response = chat.last.text.strip()
 
-    parsed_response = json.loads(response.choices[0].message.content)
-    messages.append({ "role": "assistant", "content": json.dumps(parsed_response) })
+    try:
+        parsed = json.loads(response)
+    except json.JSONDecodeError:
+        print("⚠️ Response was not in valid JSON format. Full response below:")
+        print(response)
+        break
 
-    if parsed_response.get("step") != "output":
-        print(f"🧠: {parsed_response.get("content")}")
+    # Append response back to chat history
+    chat.send_message(json.dumps(parsed))
+
+    step = parsed.get("step")
+    content = parsed.get("content")
+
+    if step != "output":
+        print(f"🧠: {content}")
         continue
-    
-    print(f"🤖: {parsed_response.get("content")}")
+
+    print(f"🤖: {content}")
     break
-
-
-
-# TechSupport
