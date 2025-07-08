@@ -56,7 +56,7 @@ while True:
     try:
         parsed = json.loads(response)
     except json.JSONDecodeError:
-        print("⚠️ Response was not in valid JSON format. Full response below:")
+        print("⚠️ Warning: Response was not in valid JSON format. Full response below ⚠️:")
         print(response)
         break
 
